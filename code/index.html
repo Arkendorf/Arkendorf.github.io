@@ -1,0 +1,346 @@
+<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Amon Ferri</title><link rel=icon type=image/x-icon href=/favicon.ico><meta name=author content="Amon Ferri"><meta name=description content="Amon Ferri's contact information, portfolio, code samples, and resume."><link rel=preconnect href=https://fonts.googleapis.com><link rel=preconnect href=https://fonts.gstatic.com crossorigin><link href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel=stylesheet><link rel=stylesheet href=/style.css><script src=/script.js></script>
+<link rel=stylesheet href=/components/header/style.css><link rel=stylesheet href=/components/sample/style.css><link rel=stylesheet href=/components/sample/prism.css><script src=/components/sample/prism.js></script>
+<link rel=stylesheet href=/components/footer/style.css><link rel=stylesheet href=/components/highlight/style.css><script src=/components/highlight/script.js></script><nav class=desktop><h2 id=name onclick='location.href="/"'>Amon Ferri</h2><ul><li><a class=button href=/>About</a><li><a class=button href=/portfolio>Portfolio</a><li><a class="button active" href=/code>Code Samples</a><li><a class=button href=/resume>Resume</a><li><a class=button href=/contact>Contact Me</a></ul></nav><nav class=mobile><h2 id=name onclick='location.href="/"'>Amon Ferri</h2><input type=checkbox id=toggle aria-label="Toggle navigation menu">
+<label class="icon button" for=toggle id=toggle-button><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M1 2.75A.75.75.0 011.75 2h12.5a.75.75.0 010 1.5H1.75A.75.75.0 011 2.75zm0 5A.75.75.0 011.75 7h12.5a.75.75.0 010 1.5H1.75A.75.75.0 011 7.75zM1.75 12h12.5a.75.75.0 010 1.5H1.75a.75.75.0 010-1.5z"/></svg></label><div id=menu><ul><li><a class=button href=/>About</a><li><a class=button href=/portfolio>Portfolio</a><li><a class="button active" href=/code>Code Samples</a><li><a class=button href=/resume>Resume</a><li><a class=button href=/contact>Contact Me</a></ul></div></nav><div class="top-right triangle"></div><div id=main><div class=section><h1>Code Samples</h1><div class=sample><pre><code class=language-csharp>/* 
+    Generates an array of body group weights, one per vertex in the mesh.
+    A "body group weight" is a normalized Vector4, structured as the following:
+        x: percentage influence of "head" bones on the vertex
+        y: percentage influence of "torso" bones on the vertex
+        z: percentage influence of "arm" bones on the vertex
+        w: percentage influence of "leg" bones on the vertex
+    For example, a vertex that's part of the avatar's head would probably have body group weight of (1, 0, 0, 0),
+    while neck vertices may have a weight of (.5, .5, 0, 0).
+    renderer is the skinned mesh renderer with bone information
+    mesh is the source for vertex information
+*/
+static private Vector4[] GetBodyGroupWeights(SkinnedMeshRenderer renderer, Mesh mesh)
+{
+    // Initialize the array of body group weights, one per vertex
+    Vector4[] bodyGroupWeights = new Vector4[mesh.vertexCount];
+
+    // Get bone weights
+    NativeArray<boneweight1> boneWeights = mesh.GetAllBoneWeights();
+    NativeArray<byte> bonesPerVertex = mesh.GetBonesPerVertex();
+
+    // Get the actual bones
+    Transform[] bones = renderer.bones;
+
+    // Iterate over the vertices to get body group weights for each vertex
+    int weightIndex = 0;
+    for (int vertIndex = 0; vertIndex < mesh.vertexCount; vertIndex++)
+    {
+        // Remember body group weight for this vertex
+        Vector4 bodyGroupWeight = Vector4.zero;
+        float totalWeight = 0;
+
+        // For each vertex, iterate over its bone weights
+        for (int i = 0; i < bonesPerVertex[vertIndex]; i++)
+        {
+            // Get the bone weight, and the corresponding bone
+            BoneWeight1 boneWeight = boneWeights[weightIndex];
+            Transform bone = bones[boneWeight.boneIndex];
+
+            // Get bone name without prefix (get last item after a _)
+            string[] split = bone.name.Split("_");
+            string boneName = split[split.Length - 1];
+
+            // Ensure the bone name has a corresponding body group
+            if (boneName != null && boneNameToBodyGroup.ContainsKey(boneName))
+            {
+                // Add the weight of the bone to the proper weight for the bone's body group
+                switch (boneNameToBodyGroup[boneName])
+                {
+                    case (HumanoidKit.BodyGroup.Head):
+                        bodyGroupWeight.x += boneWeight.weight;
+                        break;
+                    case (HumanoidKit.BodyGroup.Torso):
+                        bodyGroupWeight.y += boneWeight.weight;
+                        break;
+                    case (HumanoidKit.BodyGroup.Arms):
+                        bodyGroupWeight.z += boneWeight.weight;
+                        break;
+                    case (HumanoidKit.BodyGroup.Legs):
+                        bodyGroupWeight.w += boneWeight.weight;
+                        break;
+                }
+                // Add weight to the total weight for this vertex
+                totalWeight += boneWeight.weight;
+            }
+            // Increment bone weight index
+            weightIndex++;
+        }
+        // Remember weights for this vector
+        bodyGroupWeights[vertIndex] = bodyGroupWeight / totalWeight;
+    }
+
+    return bodyGroupWeights;
+}
+
+/* 
+    Creates and saves a mask texture, where each pixel's value corresponds to the body weights for that point of the mesh.
+    mesh is the source for UV coordinates (and should be the same mesh used to generate body group weights)
+    bodyGroupWeights is a array of weights, one per vertex in the mesh
+    size is the desired size of the mask texture
+*/
+static private Texture2D GenerateMaskTexture(Mesh mesh, Vector4[] bodyGroupWeights, int size)
+{
+    // Get UV coordinates for vertices
+    List<vector2> uvs = new List<vector2>();
+    mesh.GetUVs(0, uvs);
+
+    // Create the texture
+    Texture2D mask = new Texture2D(size, size, TextureFormat.RGBA32, true, true);
+    Color32[] pixels = mask.GetPixels32();
+
+    // Create queue for flood fill
+    LinkedList<vector2int> points = new LinkedList<vector2int>();
+    // The weight values for each point that has been visited
+    Dictionary<vector2int, vector4> weights = new Dictionary<vector2int, vector4>(); 
+
+    // Seed flood fill with uvs
+    for (int i = 0; i < uvs.Count; i++)
+    {
+        Vector2Int point = Vector2Int.RoundToInt(uvs[i] * size);
+
+        points.AddLast(point);
+        weights[point] = bodyGroupWeights[i];
+    }
+
+    // Flood fill
+    while (points.Count > 0)
+    {
+        Vector2Int point = points.First.Value;
+        points.RemoveFirst();
+
+        ProcessPoint(point, new Vector2Int(-1, 0), size, points, weights);
+        ProcessPoint(point, new Vector2Int(1, 0), size, points, weights);
+        ProcessPoint(point, new Vector2Int(0, -1), size, points, weights);
+        ProcessPoint(point, new Vector2Int(0, 1), size, points, weights);
+    }
+
+    // Gather pixel colors
+    for (int y = 0; y < size; y++)
+    {
+        for (int x = 0; x < size; x++)
+        {
+            int index = x + size * y;
+            Color32 color = (Color)weights[new Vector2Int(x, y)];
+            pixels[index] = color;
+        }
+    }
+
+    // Set pixel colors
+    mask.SetPixels32(pixels);
+    mask.Apply();
+
+    return mask;
+}
+
+// Processes the given point for the texture flood fill
+static private void ProcessPoint(Vector2Int parent, Vector2Int offset, int size, LinkedList<vector2int> points, Dictionary<vector2int, vector4> weights)
+{
+    Vector2Int point = parent + offset;
+
+    // Only process the point if it's within the texture's bounds
+    if (point.x >= 0 && point.x < size && point.y >= 0 && point.y < size)
+    {
+        // If this point hasn't already been filled, flood it with the weight values from its parent
+        if (!weights.ContainsKey(point))
+        {
+            points.AddLast(point);
+            weights[point] = weights[parent];
+        }
+    }
+}</code></pre><div class=info onclick=OpenHighlightSample(this)><div class=header><h3>Body Part Classification for Skinned Avatars</h3><div class=language>C#</div></div><div class=subtitle>Texture mask generation for skinned avatar meshes in Unity, where each pixel's value corresponds to a body part.</div><div class=description><p>This script was created for a VR project in which the user embodies a fully-modeled first-person avatar. Depending on the player's pose, certain parts of the avatar's body should be hidden. For example, when standing, the avatar's arms are visible (so the player knows where their hands are), but the head isn't, as it would obstruct the player's vision. When sitting, the legs become visible, to remind the user they are sitting. This approach works well for avatars composed of several meshes, as it is easy to enable or disable parts of the avatar's body. However, when the avatars are a single skinned mesh, this becomes much more challenging.<p>I solved this problem by creating a texture mask, in which each pixel corresponds to a body part. For example, each pixel UV mapped to the avatar's head has a color of (1, 0, 0, 0), and every pixel mapped to the torso is (0, 0, 0, 1). These "body group weights" can also be interpolated, so a neck pixel may have a value close to (.5, .5, 0, 0). I generate these textures by first going through every vertex in the avatar mesh, getting the bone weights for that vertex, then summing the body groups (i.e. head, torso, arm, and leg) for every bone influencing the vertex. This leaves me with a vector for every vertex which I call a "body group weight". Next, I create an empty texture. For every vertex, I set the color at its UV coordinate to its body group weight, then perform a simple flood fill to color the rest of the pixels. The resulting texture, coupled with a custom alpha clipping shader, allows me to show and hide parts of a single-mesh avatar on the fly.</div></div><button class="icon button expand" aria-label="Expand code sample" onclick=OpenHighlightSample(this)><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 10a.75.75.0 01.75.75v2.5c0 .138.112.25.25.25h2.5a.75.75.0 010 1.5h-2.5A1.75 1.75.0 011 13.25v-2.5a.75.75.0 01.75-.75zm12.5.0a.75.75.0 01.75.75v2.5A1.75 1.75.0 0113.25 15h-2.5a.75.75.0 010-1.5h2.5a.25.25.0 00.25-.25v-2.5a.75.75.0 01.75-.75zM2.75 2.5a.25.25.0 00-.25.25v2.5a.75.75.0 01-1.5.0v-2.5C1 1.784 1.784 1 2.75 1h2.5a.75.75.0 010 1.5zM10 1.75a.75.75.0 01.75-.75h2.5c.966.0 1.75.784 1.75 1.75v2.5a.75.75.0 01-1.5.0v-2.5a.25.25.0 00-.25-.25h-2.5A.75.75.0 0110 1.75z"/></svg></button></div><div class=sample><pre><code class=language-lua>-- A version of dijkstra with multiple starting points
+-- graph is the graph to pathind on
+-- starts is a list of nodes to start from, these nodes should exist in the given graph
+-- Avoid is a bool, whether or not to avoid nodes used by already-generated paths
+function Pathfind:generate(graph, starts, avoid)
+  local queue = Heap:new() -- The queue of nodes to visit
+  local visited = {} -- A list of visited nodes
+  local dist = {} -- Distance scores for each node
+  self.pred = {} -- The predecessors of each node
+  -- Iterate through every node in the given graph, setting the initial values for each
+  for _, v in pairs(graph:getNodes()) do
+    visited[v] = false
+    dist[v] = math.huge
+    self.pred[v] = nil
+  end
+  -- Iterate through all the starting node, setting their distance to 0, and adding them to the queue
+  for _, v in ipairs(starts) do
+    dist[v] = 0
+    queue:insert(v, 0)
+  end
+  -- Iterate through every node in the queue
+  while not queue:isEmpty() do
+    -- Take the node with the lowest dist as the current node
+    local node = queue:remove()
+    -- Make sure it has not been visited yet before continuing
+    if not visited[node] then
+      -- Mark the current node as visited
+      visited[node] = true
+      -- Iterate through the current node's neighbors
+      for _, v in pairs(graph:getEdges(node)) do
+        -- Calculate the new distance for this neighbor, coming from the current node
+        -- Calculate the weight for this edge
+        local weight = v.weight
+        -- If avoidance is in use, and the neightboring node has an avoidance value, add it to the weight
+        if avoid and self.avoidance[v.node] then
+          weight = weight + self.avoidance[v.node]
+        end
+        local newDist = dist[node] + weight
+        -- If the new distance is less than the current distance, update it
+        if newDist < dist[v.node] then
+          queue:insert(v.node, newDist) -- Add the node to the queue (only way of updating a priority queue)
+          dist[v.node] = newDist -- Remember the new distance
+          self.pred[v.node] = node -- Set the predecessors of the neighbor to the current node
+        end
+      end
+    end
+  end
+end
+
+-- Using a list of predecessors, return the path from the given node to a start
+function Pathfind:path(node, avoid)
+  local path = {} -- Start the path off as empty
+  local step = node -- Start at the given node, and work backwards
+  if self.pred[step] then
+    -- Until we reach a starting node (which have a predecessor of nil) continue adding steps to the path
+    while step do
+      -- Check if avoidance is in use
+      if avoid then
+        -- If this step's node already has an avoidance value, add to it
+        if self.avoidance[step] then
+          self.avoidance[step] = self.avoidance[step] + self.avoidWeight
+        else -- Otherwise, simply set it to the avoidance weight
+          self.avoidance[step] = self.avoidWeight
+        end
+      end
+      path[#path+1] = step -- Add the step to the path
+      step = self.pred[step] -- Get the predecessor of the current step
+    end
+  end
+  -- Return the generated path
+  return path
+end
+
+-- Reduces the avoidance value for all nodes on a path
+-- If start is given, all nodes before step are ignored
+function Pathfind:reducePathAvoidance(path, start)
+  -- Iterate through all nodes in the path
+  for step = start or 1, #path do
+    -- Reduce the node's avoidance
+    self:reduceNodeAvoidance(path[step])
+  end
+end
+
+-- Reduces the avoidance value for a node
+function Pathfind:reduceNodeAvoidance(node)
+  -- Make sure an avoidance value for the node exists
+  if self.avoidance[node] then
+    -- Reduce the value by the avoidance weight
+    self.avoidance[node] = self.avoidance[node] - self.avoidWeight
+    -- If the value is now zero or less, clear it
+    if self.avoidance[node] <= 0 then
+      self.avoidance[node] = nil
+    end
+  end
+end
+
+-- Clears the avoidance value for the given node
+function Pathfind:clearNodeAvoidance(node)
+  self.avoidance[node] = nil
+end</code></pre><div class=info onclick=OpenHighlightSample(this)><div class=header><h3>Efficient, Multi-Destination Pathfinding with Avoidance</h3><div class=language>Lua</div></div><div class=subtitle>Enemy pathfinding for a multiplayer game, where enemies can path to any player, and should avoid crowded paths.</div><div class=description><p>I created this custom pathfinding algorithm for a cooperative multiplayer game where players are pitted against hordes of AI-controlled enemies. Along with static nodes representing the environment, I treat players and enemies as nodes in a pathfinding graph. I modified Dijkstra's algorithm to allow for multiple source nodes, one for each player. Once the algorithm runs, enemies can easily find the shortest path from their node to the nearest player node by following a standard backtracing procedure. On rare occasions, my modification to the algorithm does not find a shortest path, but it's still more efficient than running Dijkstra's algorithm once per player, so the tradeoff is worthwhile.<p>I also integrated avoidance logic into my enemy pathfinding. Whenever an enemy picks a new path to follow, they add in a temporary avoidance value to the weight of the edges along the path.Likewise, when an enemy finishes traversing an edge, they reduce its avoidance value. When the pathfinding algorithm is re-run, edges with high avoidance values are deprioritized in favor of less-costly edges, due to the nature of the algorithm. This simple approach works well, and prevents enemies from clumping up along the same paths.</div></div><button class="icon button expand" aria-label="Expand code sample" onclick=OpenHighlightSample(this)><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 10a.75.75.0 01.75.75v2.5c0 .138.112.25.25.25h2.5a.75.75.0 010 1.5h-2.5A1.75 1.75.0 011 13.25v-2.5a.75.75.0 01.75-.75zm12.5.0a.75.75.0 01.75.75v2.5A1.75 1.75.0 0113.25 15h-2.5a.75.75.0 010-1.5h2.5a.25.25.0 00.25-.25v-2.5a.75.75.0 01.75-.75zM2.75 2.5a.25.25.0 00-.25.25v2.5a.75.75.0 01-1.5.0v-2.5C1 1.784 1.784 1 2.75 1h2.5a.75.75.0 010 1.5zM10 1.75a.75.75.0 01.75-.75h2.5c.966.0 1.75.784 1.75 1.75v2.5a.75.75.0 01-1.5.0v-2.5a.25.25.0 00-.25-.25h-2.5A.75.75.0 0110 1.75z"/></svg></button></div><div class=sample><pre><code class=language-kotlin>override fun doWork(): Result {
+        // Get contacts
+        val contactManager = ContactManager()
+        contactManager.loadContacts(applicationContext)
+
+        // Keep track of number of notifications
+        var notificationCount = 0
+
+        // Construct and register the notification channel
+        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, CHANNEL_IMPORTANCE)
+        val notificationManager: NotificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+
+        // Iterate through contacts
+        for (i in contactManager.contacts.indices) {
+            val contact = contactManager.contacts[i]
+
+            // Check if we should notify for this contact
+            if (
+                contact.notify &&
+                contactManager.notifyPercent(contact) >= 1 &&
+                contact.lastNotified + Duration.ofHours(REPEAT_INTERVAL) < Instant.now(
+            )) {
+                // Create intent for when notification is clicked
+                val intent = Intent(Intent.ACTION_VIEW, Uri.fromParts("sms", contact.numbers[0], null))
+                val pendingIntent: PendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+
+                // Construct notification
+                val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                    .setSmallIcon(R.mipmap.ic_notification)
+                    .setContentTitle("${applicationContext.getString(R.string.notification_title)} ${contact.name}")
+                    .setContentText(applicationContext.getString(R.string.notification_body))
+                    .setContentIntent(pendingIntent)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setGroup(GROUP_ID)
+                    .setAutoCancel(true)
+                    .build()
+
+                // Notify
+                with(NotificationManagerCompat.from(applicationContext)) {
+                    notify(i, notification)
+                }
+
+                notificationCount += 1
+
+                // Remember that contact was notified
+                contact.lastNotified = Instant.now()
+            }
+        }
+
+        // If at least two notifications were sent, group them under a summary notification
+        if (notificationCount > 1) {
+            val summaryNotification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_notification)
+                .setGroup(GROUP_ID)
+                .setGroupSummary(true)
+                .build()
+
+            with(NotificationManagerCompat.from(applicationContext)) {
+                notify(-1, summaryNotification)
+            }
+        }
+
+        // Save last contacted times
+        contactManager.saveContactData(applicationContext)
+
+        return Result.success()
+    }</code></pre><div class=info onclick=OpenHighlightSample(this)><div class=header><h3>Android Reminder Notifications</h3><div class=language>Kotlin</div></div><div class=subtitle>Push notifications to remind you to reach out to friends.</div><div class=description><p>This function was created for my <a href=/portfolio/intuch>Intuch</a> project. The app allows users to look through their phone contacts, and choose which ones they want to receive reminder notifications for, if they haven't reached out in a while. For Intuch, I wanted to be able to send notificationswhen the app is closed, even though Android apps can normally only send notifications while they are running. I solved this issue by creating a custom Worker class, which can run in the background even if the app itself isn't.<p>This particular Worker runs in the background once every day or so, looking through through the app's saved list of contacts, checking the last time the user texted them, and checking if it they want a reminder to reach out. If so, it creates a reminder notification for that contact and pushes it to the device. If several contacts require a notification, they are grouped together nicely under a summary notification.<p>Whenever a user clicks a notification, their text conversation with the corresponding contact opens up, making it easy for the user to reach out. Additionally, the app records the last time it sent a notification for each contact and doesn't send a new one until a pre-set interval has passed, to prevent overwhelming the user with notifications.</div></div><button class="icon button expand" aria-label="Expand code sample" onclick=OpenHighlightSample(this)><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 10a.75.75.0 01.75.75v2.5c0 .138.112.25.25.25h2.5a.75.75.0 010 1.5h-2.5A1.75 1.75.0 011 13.25v-2.5a.75.75.0 01.75-.75zm12.5.0a.75.75.0 01.75.75v2.5A1.75 1.75.0 0113.25 15h-2.5a.75.75.0 010-1.5h2.5a.25.25.0 00.25-.25v-2.5a.75.75.0 01.75-.75zM2.75 2.5a.25.25.0 00-.25.25v2.5a.75.75.0 01-1.5.0v-2.5C1 1.784 1.784 1 2.75 1h2.5a.75.75.0 010 1.5zM10 1.75a.75.75.0 01.75-.75h2.5c.966.0 1.75.784 1.75 1.75v2.5a.75.75.0 01-1.5.0v-2.5a.25.25.0 00-.25-.25h-2.5A.75.75.0 0110 1.75z"/></svg></button></div><div class=sample><pre><code class=language-javascript>// Scrolls to the given element, offsetting for the header if requested
+function ScrollToElement(id, addHeaderOffset = false) {    
+    // Get the element to we want to scroll to
+    let element = document.getElementById(id);
+
+    // Initialize offset
+    let offset = {
+        left: 0,
+        top: 0,
+    }
+
+    // Aggregate offsets of the element, recursing through parents
+    while(element != null){        
+        offset.left += element.offsetLeft;        
+        offset.top += element.offsetTop;        
+        element = element.offsetParent;        
+    }
+
+    // Offset scroll by the header's height, if requested
+    if (addHeaderOffset) {
+        const header = document.getElementById('header');
+        offset.top -= header.offsetHeight;
+    }
+
+    // Start the scroll, smoothly
+    window.scrollTo({...offset, behavior: 'smooth'});    
+}</code></pre><div class=info onclick=OpenHighlightSample(this)><div class=header><h3>Scroll to Element</h3><div class=language>JavaScript</div></div><div class=subtitle>Javascript function that dynamically scrolls to the given element's position on the page.</div><div class=description><p>I wrote this function for use within this website. Whenever you click a "continue" button (denoted by down arrow), this function is called to scroll the window to the next section. While other methods (such as the scrollIntoView() function, or focusing an element by adding it to the page url) do exist, the did not have the full functionality I was looking for. Namely, they don't support (or have spotty support for) smooth scrolling, and they don't support adding a custom offset (i.e., scrolling so that the next section starts directly below the header, rather than at the top of the page).<p>My solution takes advantage of the HTML DOM hierarchy, taking an element and recursively adding its ancestor's position offsets to find the element's total offset on the page. This approach also allows me to find the header element and add its height to the total y offset, essentially treating the bottom of the header as the top of the page. I then use the window.scrollTo() method to scroll by the total offset amount. I pass in the "behavior: 'smooth'" parameter to scroll smoothly.</div></div><button class="icon button expand" aria-label="Expand code sample" onclick=OpenHighlightSample(this)><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 10a.75.75.0 01.75.75v2.5c0 .138.112.25.25.25h2.5a.75.75.0 010 1.5h-2.5A1.75 1.75.0 011 13.25v-2.5a.75.75.0 01.75-.75zm12.5.0a.75.75.0 01.75.75v2.5A1.75 1.75.0 0113.25 15h-2.5a.75.75.0 010-1.5h2.5a.25.25.0 00.25-.25v-2.5a.75.75.0 01.75-.75zM2.75 2.5a.25.25.0 00-.25.25v2.5a.75.75.0 01-1.5.0v-2.5C1 1.784 1.784 1 2.75 1h2.5a.75.75.0 010 1.5zM10 1.75a.75.75.0 01.75-.75h2.5c.966.0 1.75.784 1.75 1.75v2.5a.75.75.0 01-1.5.0v-2.5a.25.25.0 00-.25-.25h-2.5A.75.75.0 0110 1.75z"/></svg></button></div></div></div><div class="bottom-left triangle"></div><footer class=text><ul><li><a aria-label=Email href="mailto: amon@ferri.us" target=_blank rel="noopener noreferrer">amon@ferri.us</a><li><a aria-label=LinkedIn href=https://www.linkedin.com/in/amon-ferri/ target=_blank rel="noopener noreferrer">https://www.linkedin.com/in/amon-ferri/</a><li><a aria-label=GitHub href=https://github.com/Arkendorf target=_blank rel="noopener noreferrer">https://github.com/Arkendorf</a></ul></footer><footer class=icons><ul><li><a aria-label=Email href="mailto: amon@ferri.us" target=_blank rel="noopener noreferrer"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M64 32C28.7 32 0 60.7.0 96V416c0 35.3 28.7 64 64 64H384c35.3.0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zM218 271.7 64.2 172.4C66 156.4 79.5 144 96 144H352c16.5.0 30 12.4 31.8 28.4L230 271.7c-1.8 1.2-3.9 1.8-6 1.8s-4.2-.6-6-1.8zm29.4 26.9L384 210.4V336c0 17.7-14.3 32-32 32H96c-17.7.0-32-14.3-32-32V210.4l136.6 88.2c7 4.5 15.1 6.9 23.4 6.9s16.4-2.4 23.4-6.9z"/></svg></a><li><a aria-label=LinkedIn href=https://www.linkedin.com/in/amon-ferri/ target=_blank rel="noopener noreferrer"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M416 32H31.9C14.3 32 0 46.5.0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6.0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3.0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2.0 38.5 17.3 38.5 38.5.0 21.3-17.2 38.5-38.5 38.5zm282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6.0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2.0 79.7 44.3 79.7 101.9V416z"/></svg></a><li><a aria-label=GitHub href=https://github.com/Arkendorf target=_blank rel="noopener noreferrer"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6.0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6.0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3.0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1.0-6.2-.3-40.4-.3-61.4.0.0-70 15-84.7-29.8.0.0-11.4-29.1-27.8-36.6.0.0-22.9-15.7 1.6-15.4.0.0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5.0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9.0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4.0 33.7-.3 75.4-.3 83.6.0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6.0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9.0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></a></ul></footer><div id=highlight onclick=CloseHighlight(event)><div id=highlight-frame><button id=highlight-close class="icon button" aria-label="Close image" onclick=CloseHighlight(event)><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M10.75 1a.75.75.0 01.75.75v2.5c0 .138.112.25.25.25h2.5a.75.75.0 010 1.5h-2.5A1.75 1.75.0 0110 4.25v-2.5a.75.75.0 01.75-.75zm-5.5.0a.75.75.0 01.75.75v2.5A1.75 1.75.0 014.25 6h-2.5a.75.75.0 010-1.5h2.5a.25.25.0 00.25-.25v-2.5A.75.75.0 015.25 1zM1 10.75a.75.75.0 01.75-.75h2.5c.966.0 1.75.784 1.75 1.75v2.5a.75.75.0 01-1.5.0v-2.5a.25.25.0 00-.25-.25h-2.5A.75.75.0 011 10.75zm9 1c0-.966.784-1.75 1.75-1.75h2.5a.75.75.0 010 1.5h-2.5a.25.25.0 00-.25.25v2.5a.75.75.0 01-1.5.0z"/></svg></button></div></div>

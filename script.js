@@ -1,0 +1,1 @@
+function ScrollToElement(e,t=!1){let n=document.getElementById(e),s={left:0,top:0};for(;n!=null;)s.left+=n.offsetLeft,s.top+=n.offsetTop,n=n.offsetParent;if(t){const e=document.getElementById("header");s.top-=e.offsetHeight}window.scrollTo({...s,behavior:"smooth"})}
