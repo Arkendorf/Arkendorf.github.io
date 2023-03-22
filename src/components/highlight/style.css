@@ -1,0 +1,69 @@
+/* Standard highlight style */
+
+#highlight {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow-y: scroll;
+    background-color: rgba(0, 0, 0, .6);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#highlight.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+#highlight #highlight-resizer {
+    box-sizing: border-box;
+    width: 100%;
+    height: auto;
+    margin: 96px 0;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+}
+
+#highlight #highlight-frame {
+    position: relative;
+    width: var(--main-width);
+    height: auto;
+    box-shadow: var(--light-shadow);
+}
+
+#highlight #highlight-item {
+    width: 100%;
+    height: 100%;
+    background-color: black;
+}
+
+#highlight #highlight-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+
+
+/* Highlight fit style (used for image and video highlights) */
+
+#highlight.fit {
+    justify-content: center;
+}
+
+#highlight.fit #highlight-resizer {
+    max-height: 100%;
+    padding: 32px;
+    margin: 0;
+}
+
+#highlight.fit #highlight-frame {
+    width: auto;
+    max-width: 100%;
+}

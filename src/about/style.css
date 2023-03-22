@@ -1,0 +1,12 @@
+#main {
+    padding: 0;
+}
+
+#intro-img {
+    width: 100%;
+    box-shadow: var(--light-shadow);
+}
+
+#portfolio .single {
+    justify-content: flex-end;
+}

@@ -1,0 +1,34 @@
+.project {
+    box-sizing: border-box;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 100%;
+    grid-template-rows: 1fr auto;
+    gap: 0;
+    overflow: hidden;
+    cursor: pointer;
+    background-color: var(--light-background);
+    box-shadow: var(--light-shadow);
+    transition: box-shadow .3s, opacity .3s;
+}
+
+.project:hover {
+    opacity: 0.8;
+    box-shadow: var(--dark-shadow);
+}
+
+.project img {
+    grid-row: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    overflow: hidden;
+}
+
+.project .info {
+    grid-row: 2;
+    height: 104px;
+    padding: 8px;
+}
