@@ -23,7 +23,7 @@
                     </div>
                     <div class="single">
                         <h1>Hi, I'm Amon.</h1>
-                        <p>I enjoy solving the technical and creative challenges present in all aspects of software engineering. My journey began with game development, but has since led to making websites, creating mobile apps, and building AR and VR experiences, among many other detours. This website hosts a collection of my work in these areas, with the hope that it demonstrates my creativity, passion, and skill.</p>  
+                        <p>I enjoy solving the technical and creative challenges present in all aspects of software engineering. My journey began with game development, but has since led to making websites, creating mobile apps, and building AR and VR experiences, among many other adventures. This website hosts a collection of my work in these areas, with the hope that it demonstrates my creativity, passion, and skill.</p>  
                     </div>             
                 </div>
                 <div class="end">
