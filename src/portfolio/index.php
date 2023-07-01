@@ -39,6 +39,12 @@
                         'oddmount'
                     ) ?>
                     <?php ProjectTileBody(
+                        'Conversation Pit', 
+                        '/portfolio/conversationpit/gallery/logo.png', 
+                        'A VR discussion space that visualizes your conversations through generative AI.', 
+                        'conversationpit'
+                    ) ?>
+                    <?php ProjectTileBody(
                         'The Glade', 
                         '/portfolio/glade/gallery/logo.png', 
                         'An alien horseback-riding experience that melds real-world tactility with a VR experience.', 
@@ -58,6 +64,12 @@
                         '/portfolio/arithmos/gallery/logo.png', 
                         'A fun, immersive, educational math game.', 
                         'arithmos'
+                    ) ?>
+                    <?php ProjectTileBody(
+                        'Red Is Gone', 
+                        '/portfolio/redisgone/gallery/logo.png', 
+                        'A pixel art narrative mystery based on a classic fairy tale.', 
+                        'redisgone'
                     ) ?>
                     <?php ProjectTileBody(
                         'Flioneer', 
