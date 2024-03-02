@@ -24,7 +24,7 @@
                 '/portfolio/poppy3/gallery/playhouse.jpg',
                 '/portfolio/poppy3/gallery/school.jpg',
                 '/portfolio/poppy3/gallery/toys.jpg',
-                '/portfolio/poppy3/gallery/tunnel.jpg',
+                '/portfolio/poppy3/gallery/tunnels.jpg',
 			),
 		); ?>
     </body>
