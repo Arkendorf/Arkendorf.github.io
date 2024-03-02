@@ -18,6 +18,21 @@
         <div id="main">
             <div class="section">
                 <h1>Portfolio</h1>
+                <h2>Professional Work</h2>
+                <div class="project-category">
+                    <?php ProjectTileBody(
+                        'Poppy Playtime: Chapter 3', 
+                        '/portfolio/poppy3/gallery/logo.png', 
+                        'Explore a decrepit orphanage and discover the horrible secrets left behind.', 
+                        'poppy3'
+                    ) ?>
+                    <?php ProjectTileBody(
+                        'Poppy Playtime Console Port', 
+                        '/portfolio/poppy1/gallery/logo.png', 
+                        'Introducing more victims to a haunted toy factory.', 
+                        'poppy1'
+                    ) ?>
+                </div>
                 <h2>AR/VR Projects</h2>
                 <div class="project-category">
                     <?php ProjectTileBody(
